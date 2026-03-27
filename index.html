@@ -67,34 +67,56 @@
 
 <script>
     const LIFF_ID = "2009617030-XtqKOyjE"; 
-    const officePos = [13.862444, 100.503806]; 
     const googleAppUrl = "https://script.google.com/macros/s/AKfycbz0_6Z0zRQ_PO5ZjVEmVaICtQ_57h6BlcfG6ONMI_-EDGHrkwrclAq1sk4iiTkS4oWc/exec"; 
-    const radiusLimit = 100; 
+    
+    // ค่าเริ่มต้น (จะถูกเขียนทับด้วยค่าจริงจากชีต Settings)
+    let officePos = [13.862444, 100.503806]; 
+    let radiusLimit = 100; 
 
-    let map, userMarker;
+    let map, userMarker, circleArea;
 
     window.onload = function() {
-        initMap();
         initLiff();
     };
 
-    function initMap() {
-        map = L.map('map', {zoomControl: false}).setView(officePos, 17);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        L.circle(officePos, { radius: radiusLimit, color: '#00796b', fillOpacity: 0.1 }).addTo(map);
+    // ฟังก์ชันสร้างแผนที่ (รองรับการวาดซ้ำเมื่อค่า Settings เปลี่ยน)
+    function renderMap() {
+        if (!map) {
+            map = L.map('map', {zoomControl: false}).setView(officePos, 17);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        } else {
+            map.setView(officePos, 17);
+        }
+        
+        if (circleArea) map.removeLayer(circleArea);
+        circleArea = L.circle(officePos, { radius: radiusLimit, color: '#00796b', fillOpacity: 0.1 }).addTo(map);
         L.circleMarker(officePos, { radius: 6, color: 'red', fillOpacity: 1 }).addTo(map);
     }
 
     async function initLiff() {
         try {
             await liff.init({ liffId: LIFF_ID });
+            
+            // --- ดึงค่าจากหน้าชีต Settings อัตโนมัติ ---
+            const resp = await fetch(`${googleAppUrl}?action=getSettings`);
+            const settings = await resp.json();
+            officePos = settings.officePos;
+            radiusLimit = settings.radius;
+
+            renderMap(); // วาดแผนที่ตามพิกัดและรัศมีจากชีต
+
             if (liff.isLoggedIn()) {
                 const profile = await liff.getProfile();
                 document.getElementById('user-img').src = profile.pictureUrl;
             }
             checkUser();
             startTracking();
-        } catch (err) { checkUser(); startTracking(); }
+        } catch (err) { 
+            console.error("LIFF Init Error:", err);
+            renderMap();
+            checkUser(); 
+            startTracking(); 
+        }
     }
 
     function checkUser() {
@@ -113,7 +135,6 @@
         }
     }
 
-    // ฟังก์ชันตรวจสอบพนักงานจาก Sheet (แก้ไขใหม่เพื่อให้คุยกับ Apps Script สำเร็จ)
     async function verifyEmployee() {
         const id = document.getElementById('reg-id').value.trim();
         if(!id) return alert("กรุณากรอกรหัสพนักงาน");
@@ -124,7 +145,6 @@
         btnVerify.disabled = true;
         statusTxt.innerText = "⏳ กำลังตรวจสอบรหัสพนักงาน...";
 
-        // ดึง Line UID เพื่อเอาไปบันทึกลงคอลัมน์ E ในชีตพนักงาน
         let lineUid = "";
         try {
             const profile = await liff.getProfile();
@@ -132,7 +152,7 @@
         } catch (e) {}
 
         try {
-            // เรียกผ่าน GET เพื่อเลี่ยงปัญหา CORS
+            // ส่ง lineUid ไปด้วยเพื่อใช้ระบบล็อคเครื่อง (Device Locking)
             const resp = await fetch(`${googleAppUrl}?action=verifyEmployee&employeeId=${id}&lineUid=${lineUid}`);
             const result = await resp.json();
 
@@ -142,13 +162,14 @@
                 alert("✅ ยืนยันตัวตนสำเร็จ: คุณ " + result.name);
                 location.reload();
             } else {
-                alert("❌ ไม่พบรหัสพนักงานนี้ในฐานข้อมูล");
-                statusTxt.innerText = "กรุณาตรวจสอบรหัสอีกครั้ง";
+                // แสดงข้อความ Error จาก Server (เช่น "รหัสนี้ถูกใช้กับเครื่องอื่นไปแล้ว")
+                alert("❌ " + (result.message || "ไม่พบรหัสพนักงานนี้"));
+                statusTxt.innerText = "กรุณาตรวจสอบข้อมูลอีกครั้ง";
                 btnVerify.disabled = false;
             }
         } catch (err) {
             console.error(err);
-            alert("⚠️ เชื่อมต่อฐานข้อมูลไม่ได้ กรุณาตรวจสอบการ Deploy Web App");
+            alert("⚠️ เชื่อมต่อฐานข้อมูลไม่ได้");
             btnVerify.disabled = false;
         }
     }
@@ -158,16 +179,20 @@
             const lat = pos.coords.latitude, lng = pos.coords.longitude;
             if (userMarker) map.removeLayer(userMarker);
             userMarker = L.marker([lat, lng]).addTo(map);
+            
             const dist = calculateDistance(lat, lng, officePos[0], officePos[1]);
             document.getElementById('distance-info').innerText = "📍 ห่างจากร้าน: " + Math.round(dist) + " เมตร";
+            
             const btnIn = document.getElementById('btn-in'), btnOut = document.getElementById('btn-out');
             const statusTxt = document.getElementById('status-text');
+            
             if (dist <= radiusLimit) {
                 btnIn.disabled = false; btnOut.disabled = false;
                 statusTxt.innerText = "✅ พร้อมบันทึก"; statusTxt.style.color = "green";
             } else {
                 btnIn.disabled = true; btnOut.disabled = true;
-                statusTxt.innerText = "❌ ไม่อยู่ในพื้นที่ร้าน"; statusTxt.style.color = "red";
+                statusTxt.innerText = "❌ ไม่อยู่ในพื้นที่ร้าน (จำกัดที่ " + radiusLimit + " ม.)"; 
+                statusTxt.style.color = "red";
             }
         }, null, { enableHighAccuracy: true });
     }
@@ -199,13 +224,13 @@
                 const id = status === 'เข้างาน' ? 'time-in' : 'time-out';
                 document.getElementById(id).innerText = timeStr;
                 localStorage.setItem(key, timeStr);
-                alert("บันทึกเรียบร้อย!");
+                alert("บันทึก " + status + " เรียบร้อย!");
                 document.getElementById('status-text').innerText = "✅ บันทึกแล้วเมื่อ " + timeStr;
             });
         });
     }
 
-    function clearData() { if(confirm("ล้างข้อมูล?")) { localStorage.clear(); location.reload(); } }
+    function clearData() { if(confirm("ล้างข้อมูลการลงทะเบียน? หากล้างแล้วต้องให้ Admin เคลียร์ UID ในชีตก่อนจึงจะลงทะเบียนใหม่ได้")) { localStorage.clear(); location.reload(); } }
 </script>
 </body>
 </html>
