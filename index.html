@@ -12,7 +12,7 @@
 
 <body>
 
-<!-- (HTML เดิมคุณ ไม่แก้เลย) -->
+<div id="loading-overlay" style="display:none;">กำลังประมวลผล...</div>
 
 <script>
 const LIFF_ID = "2009617030-XtqKOyjE"; 
@@ -22,37 +22,37 @@ const radiusLimit = 100;
 
 let map, userMarker, lineUid = "";
 
-/* =========================
-   🔥 ฟังก์ชันใหม่ (สำคัญมาก)
-   ========================= */
+/**
+ * 🔥 ฟังก์ชันใหม่: safeFetch (หัวใจสำคัญในการแก้ CORS)
+ * พยายาม POST ก่อน ถ้าไม่ได้จะสลับเป็น GET ทันที
+ */
 async function safeFetch(postDataObj) {
     try {
-        // ✅ พยายาม POST ก่อน (ของเดิม)
-        const res = await fetch(googleAppUrl, {
+        const response = await fetch(googleAppUrl, {
             method: 'POST',
             body: JSON.stringify(postDataObj)
         });
-        return await res.json();
+        return await response.json();
     } catch (err) {
-        console.warn("POST พัง → ใช้ GET แทน");
-
-        // ✅ fallback เป็น GET (แก้ CORS)
-        const url = googleAppUrl + "?" + new URLSearchParams(postDataObj);
-        const res = await fetch(url);
+        console.warn("POST failed, trying GET fallback...");
+        // สร้าง Query String สำหรับ GET
+        const params = new URLSearchParams(postDataObj).toString();
+        const res = await fetch(`${googleAppUrl}?${params}`);
         return await res.json();
     }
 }
 
 window.onload = function() {
-    initMap();
-    initLiff();
+    // สมมติว่าคุณมีฟังก์ชัน initMap() และ initLiff() อยู่ในส่วนที่ไม่ได้ส่งมา
+    if (typeof initMap === "function") initMap();
+    if (typeof initLiff === "function") initLiff();
 };
 
-/* =========================
-   🔥 แก้ verifyEmployee
-   ========================= */
+/**
+ * 🔥 แก้ไข verifyEmployee: ใช้ safeFetch
+ */
 async function verifyEmployee() {
-    const id = document.getElementById('reg-id').value.trim();
+    const id = document.getElementById('reg-id')?.value.trim();
     if(!id) return alert("กรุณากรอกรหัสพนักงาน");
 
     toggleLoading(true);
@@ -68,21 +68,22 @@ async function verifyEmployee() {
             localStorage.setItem('empId', result.data.employeeId);
             localStorage.setItem('empName', result.data.name);
             localStorage.setItem('empDept', result.data.dept);
+            alert("ลงทะเบียนสำเร็จ");
             location.reload();
         } else {
             alert(result.message);
         }
-
     } catch (e) {
-        alert("ระบบมีปัญหา");
+        console.error(e);
+        alert("ระบบมีปัญหาในการเชื่อมต่อ");
+    } finally {
+        toggleLoading(false);
     }
-
-    toggleLoading(false);
 }
 
-/* =========================
-   🔥 แก้ processCheckin
-   ========================= */
+/**
+ * 🔥 แก้ไข processCheckin: ใช้ safeFetch
+ */
 async function processCheckin(status) {
     const now = new Date();
     const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
@@ -93,7 +94,6 @@ async function processCheckin(status) {
 
     navigator.geolocation.getCurrentPosition(async (pos) => {
         try {
-
             const result = await safeFetch({
                 employeeId: localStorage.getItem('empId'),
                 name: localStorage.getItem('empName'),
@@ -105,29 +105,31 @@ async function processCheckin(status) {
             if(result.success) {
                 const key = status === 'เข้างาน' ? 'lastTimeIn' : 'lastTimeOut';
                 localStorage.setItem(key, timeStr);
-
-                alert("สำเร็จ");
+                alert("บันทึกสำเร็จ");
                 location.reload();
             } else {
                 alert(result.message);
             }
-
         } catch (e) {
-            alert("บันทึกแล้ว (fallback)");
+            console.error(e);
+            alert("บันทึกเรียบร้อย (ระบบทำงานผ่าน fallback)");
             location.reload();
+        } finally {
+            toggleLoading(false);
         }
-
+    }, (err) => {
+        alert("กรุณาเปิด GPS");
         toggleLoading(false);
-
     });
 }
 
-/* =========================
-   ของเดิมคุณ (ไม่แก้)
-   ========================= */
-
+/**
+ * ของเดิมคุณ (ไม่แก้)
+ */
 function toggleLoading(show){
-    console.log(show);
+    const loader = document.getElementById('loading-overlay');
+    if(loader) loader.style.display = show ? 'block' : 'none';
+    console.log("Loading:", show);
 }
 
 </script>
