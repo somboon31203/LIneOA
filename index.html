@@ -2,41 +2,37 @@
 <html lang="th">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>บันทึกเวลา - somboon VanAccessory</title>
     <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; background: #f0f2f5; color: #1c1e21; padding-bottom: 20px; }
-        .header { background: #00796b; color: white; padding: 15px; text-align: center; font-size: 18px; font-weight: bold; position: sticky; top: 0; z-index: 1000; }
-        .container { padding: 10px; max-width: 450px; margin: auto; }
+        body { font-family: sans-serif; margin: 0; background: #f0f2f5; color: #1c1e21; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        .header { background: #00796b; color: white; padding: 15px; text-align: center; font-size: 18px; font-weight: bold; flex-shrink: 0; }
         
-        /* ล็อคขนาดแผนที่ */
-        #map { height: 250px; width: 100%; border-radius: 15px; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border: 2px solid white; z-index: 1; }
+        /* แผนที่กินพื้นที่ส่วนบน */
+        #map { flex-grow: 1; width: 100%; z-index: 1; border-bottom: 2px solid #ddd; }
         
-        /* แก้ไขภาพโปรไฟล์ให้เล็กลงแน่นอน */
-        .profile-section { text-align: center; margin-top: 10px; margin-bottom: 10px; }
-        .user-avatar { 
-            width: 80px !important; 
-            height: 80px !important; 
-            border-radius: 50%; 
-            border: 3px solid #00796b; 
-            object-fit: cover; 
-            display: none; 
-            margin: 0 auto 10px; 
-        }
+        /* ส่วนข้อมูลและปุ่ม ถูกดันลงมาด้านล่าง */
+        .bottom-panel { background: white; padding: 15px; border-radius: 20px 20px 0 0; box-shadow: 0 -5px 15px rgba(0,0,0,0.1); z-index: 10; flex-shrink: 0; }
         
-        #distance-info { text-align: center; font-size: 16px; font-weight: bold; color: #00796b; background: white; padding: 10px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        #distance-info { text-align: center; font-size: 15px; font-weight: bold; color: #00796b; background: #e0f2f1; padding: 8px; border-radius: 20px; margin-bottom: 12px; }
         
-        .card { background: white; padding: 15px; border-radius: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
-        .btn { flex: 1; padding: 16px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
-        .btn-in { background: #28a745; }
-        .btn-out { background: #dc3545; }
-        .btn:disabled { background: #ccc; opacity: 0.6; }
+        .profile-section { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        .user-avatar { width: 50px; height: 50px; border-radius: 50%; border: 2px solid #00796b; object-fit: cover; }
+        .user-details { font-size: 14px; flex-grow: 1; }
         
-        #status-text { text-align: center; font-weight: bold; margin-top: 15px; display: block; font-size: 14px; }
+        .btn-group { display: flex; gap: 10px; }
+        .btn { flex: 1; padding: 15px 5px; border: none; border-radius: 15px; color: white; font-size: 17px; font-weight: bold; cursor: pointer; transition: 0.2s; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .btn-in { background: #28a745; box-shadow: 0 4px 0 #1e7e34; }
+        .btn-out { background: #dc3545; box-shadow: 0 4px 0 #a71d2a; }
+        .btn:disabled { background: #ccc !important; box-shadow: 0 4px 0 #999 !important; opacity: 0.6; }
+        .btn:active { transform: translateY(3px); box-shadow: none; }
+        
+        .btn-time { font-size: 12px; font-weight: normal; margin-top: 2px; opacity: 0.9; }
+        
+        #status-text { text-align: center; font-weight: bold; margin-top: 10px; display: block; font-size: 13px; }
         .hidden { display: none; }
         input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
     </style>
@@ -45,41 +41,45 @@
 
 <div class="header">somboon VanAccessory ลงเวลา</div>
 
-<div class="container">
-    <div id="map"></div>
-    
-    <div id="distance-info">📍 กำลังคำนวณระยะทาง...</div>
+<div id="map"></div>
 
-    <div class="profile-section">
-        <img id="user-img" class="user-avatar" src="" alt="Profile">
-        
-        <div id="checkin-section" class="hidden">
-            <p style="margin: 5px 0;">สวัสดีคุณ: <strong id="display-name"></strong></p>
-            <p style="font-size: 12px; color: #666; margin-bottom: 10px;">(ID: <span id="display-id"></span>)</p>
-            
-            <div class="card">
-                <div class="btn-group">
-                    <button id="btn-in" class="btn btn-in" onclick="processCheckin('เข้างาน')" disabled>เข้างาน</button>
-                    <button id="btn-out" class="btn btn-out" onclick="processCheckin('ออกงาน')" disabled>ออกงาน</button>
-                </div>
+<div class="bottom-panel">
+    <div id="distance-info">📍 กำลังพิกัด...</div>
+
+    <div id="checkin-section" class="hidden">
+        <div class="profile-section">
+            <img id="user-img" class="user-avatar" src="" alt="Profile">
+            <div class="user-details">
+                <strong>คุณ <span id="display-name"></span></strong><br>
+                <span id="display-id" style="font-size: 11px; color: #666;"></span>
             </div>
-            
-            <button style="background:none; border:none; color:#007bff; font-size:12px; margin-top:15px; cursor:pointer;" onclick="clearData()">📝 แก้ไขข้อมูลพนักงาน</button>
+            <button style="background:none; border:none; color:#007bff; font-size:12px; cursor:pointer;" onclick="clearData()">📝 แก้ไข</button>
+        </div>
+        
+        <div class="btn-group">
+            <button id="btn-in" class="btn btn-in" onclick="processCheckin('เข้างาน')" disabled>
+                <span>เข้างาน</span>
+                <span id="time-in" class="btn-time">--:--</span>
+            </button>
+            <button id="btn-out" class="btn btn-out" onclick="processCheckin('ออกงาน')" disabled>
+                <span>ออกงาน</span>
+                <span id="time-out" class="btn-time">--:--</span>
+            </button>
         </div>
     </div>
 
-    <div id="registration-form" class="card hidden">
-        <h3 style="margin-top:0; text-align: center;">ลงทะเบียนพนักงาน</h3>
+    <div id="registration-form" class="hidden">
+        <h3 style="margin:0 0 10px 0; text-align: center; font-size: 16px;">ลงทะเบียนพนักงาน</h3>
         <input type="text" id="reg-id" placeholder="รหัสพนักงาน">
         <input type="text" id="reg-name" placeholder="ชื่อ-นามสกุล">
-        <button class="btn btn-in" style="width:100%; margin-top:10px;" onclick="register()">เริ่มใช้งาน</button>
+        <button class="btn btn-in" style="width:100%;" onclick="register()">เริ่มใช้งาน</button>
     </div>
 
-    <span id="status-text">กำลังโหลดข้อมูล...</span>
+    <span id="status-text">กำลังโหลด...</span>
 </div>
 
 <script>
-    // --- ตั้งค่าเดิมของคุณ ---
+    // --- ตั้งค่าเดิม (ห้ามตัด) ---
     const LIFF_ID = "2009617030-XtqKOyjE"; 
     const officePos = [13.862444, 100.503806]; 
     const googleAppUrl = "https://script.google.com/macros/s/AKfycbz0_6Z0zRQ_PO5ZjVEmVaICtQ_57h6BlcfG6ONMI_-EDGHrkwrclAq1sk4iiTkS4oWc/exec"; 
@@ -90,13 +90,16 @@
     window.onload = function() {
         initMap();
         initLiff();
+        // โหลดเวลาล่าสุดจากความจำเครื่อง
+        if(localStorage.getItem('lastTimeIn')) document.getElementById('time-in').innerText = localStorage.getItem('lastTimeIn');
+        if(localStorage.getItem('lastTimeOut')) document.getElementById('time-out').innerText = localStorage.getItem('lastTimeOut');
     };
 
     function initMap() {
-        map = L.map('map').setView(officePos, 17);
+        map = L.map('map', {zoomControl: false}).setView(officePos, 17);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
         L.circle(officePos, { radius: radiusLimit, color: 'red', fillOpacity: 0.1 }).addTo(map);
-        L.circleMarker(officePos, { radius: 6, color: 'red', fillOpacity: 1 }).addTo(map).bindPopup("ร้านสมบูรณ์");
+        L.circleMarker(officePos, { radius: 6, color: 'red', fillOpacity: 1 }).addTo(map);
     }
 
     async function initLiff() {
@@ -107,41 +110,31 @@
                 localStorage.setItem('empId', profile.userId);
                 localStorage.setItem('empName', profile.displayName);
                 document.getElementById('user-img').src = profile.pictureUrl;
-                document.getElementById('user-img').style.display = 'block';
                 showCheckinPage(profile.userId, profile.displayName);
-            } else {
-                checkManualData();
-            }
+            } else { checkManualData(); }
             startTracking();
-        } catch (err) {
-            checkManualData();
-            startTracking();
-        }
+        } catch (err) { checkManualData(); startTracking(); }
     }
 
     function checkManualData() {
-        const sid = localStorage.getItem('empId');
-        const sname = localStorage.getItem('empName');
+        const sid = localStorage.getItem('empId'), sname = localStorage.getItem('empName');
         if (sid && sname) showCheckinPage(sid, sname);
         else document.getElementById('registration-form').classList.remove('hidden');
     }
 
     function startTracking() {
         navigator.geolocation.watchPosition(pos => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            
+            const lat = pos.coords.latitude, lng = pos.coords.longitude;
             if (userMarker) map.removeLayer(userMarker);
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup("คุณอยู่ที่นี่").openPopup();
             
             const group = new L.featureGroup([L.circleMarker(officePos), userMarker]);
-            map.fitBounds(group.getBounds().pad(0.5));
+            map.fitBounds(group.getBounds().pad(0.3));
 
             const dist = calculateDistance(lat, lng, officePos[0], officePos[1]);
             document.getElementById('distance-info').innerText = "📍 ระยะห่าง: " + Math.round(dist) + " เมตร";
 
-            const btnIn = document.getElementById('btn-in');
-            const btnOut = document.getElementById('btn-out');
+            const btnIn = document.getElementById('btn-in'), btnOut = document.getElementById('btn-out');
             const statusTxt = document.getElementById('status-text');
 
             if (dist <= radiusLimit) {
@@ -160,9 +153,7 @@
         const R = 6371e3;
         const dLat = (lat2-lat1) * Math.PI/180;
         const dLon = (lon2-lon1) * Math.PI/180;
-        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                  Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
-                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2) * Math.sin(dLon/2);
         return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
@@ -171,12 +162,17 @@
         document.getElementById('checkin-section').classList.remove('hidden');
         document.getElementById('display-id').innerText = id.substring(0,10) + "...";
         document.getElementById('display-name').innerText = name;
-        document.getElementById('status-text').innerText = "ระบุตำแหน่งสำเร็จ";
+        document.getElementById('status-text').innerText = "ระบุตัวตนสำเร็จ";
     }
 
     function processCheckin(status) {
-        if(!confirm("ยืนยันการ " + status + " ?")) return;
+        const now = new Date();
+        const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+        
+        if(!confirm("ยืนยันการ " + status + " เวลา " + timeStr + " ?")) return;
+        
         document.getElementById('status-text').innerText = "⌛ กำลังบันทึกข้อมูล...";
+        
         navigator.geolocation.getCurrentPosition(pos => {
             fetch(googleAppUrl, {
                 method: 'POST', mode: 'no-cors',
@@ -187,22 +183,27 @@
                     coords: pos.coords.latitude + "," + pos.coords.longitude
                 })
             }).then(() => {
+                // บันทึกเวลาลงบนปุ่ม
+                if(status === 'เข้างาน') {
+                    document.getElementById('time-in').innerText = timeStr;
+                    localStorage.setItem('lastTimeIn', timeStr);
+                } else {
+                    document.getElementById('time-out').innerText = timeStr;
+                    localStorage.setItem('lastTimeOut', timeStr);
+                }
                 alert("บันทึก " + status + " สำเร็จ!");
-                location.reload();
+                document.getElementById('status-text').innerText = "บันทึกล่าสุดเมื่อ " + timeStr;
             }).catch(e => alert("บันทึกไม่สำเร็จ โปรดลองอีกครั้ง"));
         });
     }
 
     function register() {
-        const id = document.getElementById('reg-id').value;
-        const name = document.getElementById('reg-name').value;
+        const id = document.getElementById('reg-id').value, name = document.getElementById('reg-name').value;
         if(id && name) {
             localStorage.setItem('empId', id);
             localStorage.setItem('empName', name);
             location.reload();
-        } else {
-            alert("กรุณากรอกข้อมูลให้ครบ");
-        }
+        } else { alert("กรุณากรอกข้อมูลให้ครบ"); }
     }
 
     function clearData() {
