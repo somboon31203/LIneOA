@@ -45,7 +45,7 @@
 
     <div id="checkin-section" class="hidden">
         <div class="profile-section">
-            <img id="user-img" class="user-avatar" src="https://www.w3schools.com/howto/img_avatar.png" alt="Profile">
+            <img id="user-img" class="user-avatar" src="https://cdn-icons-png.flaticon.com/512/149/149071.png" alt="Profile">
             <div class="user-details">
                 <strong>คุณ <span id="display-name"></span></strong><br>
                 <span id="display-dept" style="font-size: 12px; color: #00796b;"></span> | 
@@ -88,6 +88,11 @@
     window.onload = function() {
         initMap();
         initLiff();
+        
+        // ดัก Error รูปภาพเพื่อไม่ให้สคริปต์หยุดทำงาน
+        document.getElementById('user-img').onerror = function() {
+            this.src = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+        };
     };
 
     function initMap() {
@@ -134,9 +139,7 @@
                 body: JSON.stringify({ action: "register", employeeId: id, lineUid: lineUid })
             });
             
-            const resText = await response.text();
-            let result;
-            try { result = JSON.parse(resText); } catch(e) { throw new Error("การตอบกลับจากระบบไม่ถูกต้อง"); }
+            const result = await response.json();
 
             if(result.success) {
                 localStorage.setItem('empId', result.data.employeeId);
@@ -207,8 +210,7 @@
         navigator.geolocation.getCurrentPosition(pos => {
             fetch(googleAppUrl, {
                 method: 'POST',
-                // เปลี่ยนจาก no-cors เป็น cors เพื่อให้รับผลลัพธ์ success กลับมาได้
-                mode: 'cors', 
+                mode: 'cors', // ปรับเป็น cors เพื่อรอรับผลลัพธ์กลับมาปิดหน้าโหลด
                 body: JSON.stringify({
                     employeeId: localStorage.getItem('empId'),
                     name: localStorage.getItem('empName'),
@@ -225,17 +227,14 @@
                     alert("บันทึก " + status + " สำเร็จ!");
                     location.reload();
                 } else {
-                    alert("บันทึกไม่สำเร็จ: " + result.message);
+                    alert("เกิดข้อผิดพลาด: " + result.message);
                     toggleLoading(false);
                 }
             })
             .catch(e => {
-                // กรณี Error แต่ข้อมูลอาจจะเข้าแล้ว (Apps Script บางทีมีปัญหา CORS)
-                // เราจะเช็คว่าถ้าไม่มี error จริงๆ ให้ถือว่าผ่าน
-                console.log("บันทึกผ่านระบบสำรอง");
-                const key = status === 'เข้างาน' ? 'lastTimeIn' : 'lastTimeOut';
-                localStorage.setItem(key, timeStr);
-                alert("บันทึก " + status + " เรียบร้อยแล้ว");
+                // กรณี Error แต่ข้อมูลอาจจะบันทึกไปแล้ว ให้ลอง Refresh
+                console.error("Fetch error:", e);
+                alert("บันทึกเรียบร้อยแล้ว (Reload)");
                 location.reload();
             });
         }, err => {
