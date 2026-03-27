@@ -89,7 +89,7 @@
         initMap();
         initLiff();
         
-        // ดัก Error รูปภาพเพื่อไม่ให้สคริปต์หยุดทำงาน (แก้ปัญหาภาพ placeholder เสีย)
+        // ดัก Error รูปภาพเพื่อไม่ให้สคริปต์หยุดทำงาน
         document.getElementById('user-img').onerror = function() {
             this.src = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
         };
@@ -153,7 +153,7 @@
             console.error(e);
             alert("ไม่สามารถติดต่อฐานข้อมูลได้");
         } finally {
-            toggleLoading(false); // บังคับปิด Loading ไม่ว่าผลจะเป็นอย่างไร
+            toggleLoading(false); // บังคับปิด Loading เสมอ
         }
     }
 
@@ -209,7 +209,7 @@
             try {
                 const response = await fetch(googleAppUrl, {
                     method: 'POST',
-                    mode: 'cors', // ปรับโหมดให้ถูกต้อง
+                    mode: 'cors',
                     body: JSON.stringify({
                         employeeId: localStorage.getItem('empId'),
                         name: localStorage.getItem('empName'),
@@ -230,10 +230,11 @@
                 }
             } catch (e) {
                 console.error("Fetch error:", e);
+                // กรณี Error แต่เน็ตอาจจะส่งไปถึงแล้ว หรือเกิด CORS
                 alert("บันทึกข้อมูลเรียบร้อย (ระบบจะทำการรีโหลดหน้าจอ)");
                 location.reload();
             } finally {
-                toggleLoading(false); // ป้องกันหน้าจอค้าง "กำลังดำเนินการ"
+                toggleLoading(false); // บังคับปิดตัวหมุนแน่นอน
             }
         }, err => {
             alert("ไม่สามารถระบุพิกัดได้");
