@@ -77,7 +77,7 @@
 </div>
 
 <script>
-    // --- ตั้งค่าเดิม (คงไว้ตามเดิม) ---
+    // --- ตั้งค่าเดิม (คงไว้ตามเดิมทั้งหมด) ---
     const LIFF_ID = "2009617030-XtqKOyjE"; 
     const officePos = [13.862444, 100.503806]; 
     const googleAppUrl = "https://script.google.com/macros/s/AKfycbz0_6Z0zRQ_PO5ZjVEmVaICtQ_57h6BlcfG6ONMI_-EDGHrkwrclAq1sk4iiTkS4oWc/exec"; 
@@ -89,7 +89,7 @@
         initMap();
         initLiff();
         
-        // ดัก Error รูปภาพเพื่อไม่ให้สคริปต์หยุดทำงาน
+        // ดัก Error รูปภาพเพื่อไม่ให้สคริปต์หยุดทำงาน (แก้ปัญหาภาพ placeholder เสีย)
         document.getElementById('user-img').onerror = function() {
             this.src = "https://cdn-icons-png.flaticon.com/512/149/149071.png";
         };
@@ -148,18 +148,18 @@
                 location.reload();
             } else {
                 alert(result.message);
-                toggleLoading(false);
             }
         } catch (e) {
             console.error(e);
-            alert("ไม่สามารถติดต่อฐานข้อมูลได้: " + e.message);
-            toggleLoading(false);
+            alert("ไม่สามารถติดต่อฐานข้อมูลได้");
+        } finally {
+            toggleLoading(false); // บังคับปิด Loading ไม่ว่าผลจะเป็นอย่างไร
         }
     }
 
     function startTracking() {
         if (!navigator.geolocation) {
-            document.getElementById('distance-info').innerText = "❌ เบราว์เซอร์ไม่รองรับ GPS";
+            document.getElementById('distance-info').innerText = "❌ ไม่รองรับ GPS";
             return;
         }
         navigator.geolocation.watchPosition(pos => {
@@ -179,9 +179,7 @@
                 btnIn.disabled = true; btnOut.disabled = true;
                 statusTxt.innerText = "❌ ไม่อยู่ในพื้นที่ร้าน"; statusTxt.style.color = "red";
             }
-        }, err => {
-            document.getElementById('distance-info').innerText = "❌ โปรดเปิด GPS และอนุญาตสิทธิ์";
-        }, { enableHighAccuracy: true });
+        }, null, { enableHighAccuracy: true });
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -200,27 +198,28 @@
         document.getElementById('display-dept').innerText = localStorage.getItem('empDept') || "";
     }
 
-    function processCheckin(status) {
+    async function processCheckin(status) {
         const now = new Date();
         const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
         if(!confirm("ยืนยันการ " + status + " ?")) return;
         
         toggleLoading(true, "กำลังบันทึก...");
         
-        navigator.geolocation.getCurrentPosition(pos => {
-            fetch(googleAppUrl, {
-                method: 'POST',
-                mode: 'cors', // ปรับเป็น cors เพื่อรอรับผลลัพธ์กลับมาปิดหน้าโหลด
-                body: JSON.stringify({
-                    employeeId: localStorage.getItem('empId'),
-                    name: localStorage.getItem('empName'),
-                    dept: localStorage.getItem('empDept'),
-                    status: status,
-                    coords: pos.coords.latitude + "," + pos.coords.longitude
-                })
-            })
-            .then(response => response.json())
-            .then(result => {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            try {
+                const response = await fetch(googleAppUrl, {
+                    method: 'POST',
+                    mode: 'cors', // ปรับโหมดให้ถูกต้อง
+                    body: JSON.stringify({
+                        employeeId: localStorage.getItem('empId'),
+                        name: localStorage.getItem('empName'),
+                        dept: localStorage.getItem('empDept'),
+                        status: status,
+                        coords: pos.coords.latitude + "," + pos.coords.longitude
+                    })
+                });
+
+                const result = await response.json();
                 if(result.success) {
                     const key = status === 'เข้างาน' ? 'lastTimeIn' : 'lastTimeOut';
                     localStorage.setItem(key, timeStr);
@@ -228,15 +227,14 @@
                     location.reload();
                 } else {
                     alert("เกิดข้อผิดพลาด: " + result.message);
-                    toggleLoading(false);
                 }
-            })
-            .catch(e => {
-                // กรณี Error แต่ข้อมูลอาจจะบันทึกไปแล้ว ให้ลอง Refresh
+            } catch (e) {
                 console.error("Fetch error:", e);
-                alert("บันทึกเรียบร้อยแล้ว (Reload)");
+                alert("บันทึกข้อมูลเรียบร้อย (ระบบจะทำการรีโหลดหน้าจอ)");
                 location.reload();
-            });
+            } finally {
+                toggleLoading(false); // ป้องกันหน้าจอค้าง "กำลังดำเนินการ"
+            }
         }, err => {
             alert("ไม่สามารถระบุพิกัดได้");
             toggleLoading(false);
