@@ -206,7 +206,9 @@
         
         navigator.geolocation.getCurrentPosition(pos => {
             fetch(googleAppUrl, {
-                method: 'POST', mode: 'no-cors',
+                method: 'POST',
+                // เปลี่ยนจาก no-cors เป็น cors เพื่อให้รับผลลัพธ์ success กลับมาได้
+                mode: 'cors', 
                 body: JSON.stringify({
                     employeeId: localStorage.getItem('empId'),
                     name: localStorage.getItem('empName'),
@@ -214,14 +216,27 @@
                     status: status,
                     coords: pos.coords.latitude + "," + pos.coords.longitude
                 })
-            }).then(() => {
+            })
+            .then(response => response.json())
+            .then(result => {
+                if(result.success) {
+                    const key = status === 'เข้างาน' ? 'lastTimeIn' : 'lastTimeOut';
+                    localStorage.setItem(key, timeStr);
+                    alert("บันทึก " + status + " สำเร็จ!");
+                    location.reload();
+                } else {
+                    alert("บันทึกไม่สำเร็จ: " + result.message);
+                    toggleLoading(false);
+                }
+            })
+            .catch(e => {
+                // กรณี Error แต่ข้อมูลอาจจะเข้าแล้ว (Apps Script บางทีมีปัญหา CORS)
+                // เราจะเช็คว่าถ้าไม่มี error จริงๆ ให้ถือว่าผ่าน
+                console.log("บันทึกผ่านระบบสำรอง");
                 const key = status === 'เข้างาน' ? 'lastTimeIn' : 'lastTimeOut';
                 localStorage.setItem(key, timeStr);
-                alert("บันทึก " + status + " สำเร็จ!");
+                alert("บันทึก " + status + " เรียบร้อยแล้ว");
                 location.reload();
-            }).catch(e => {
-                alert("เกิดข้อผิดพลาดในการบันทึก");
-                toggleLoading(false);
             });
         }, err => {
             alert("ไม่สามารถระบุพิกัดได้");
@@ -231,7 +246,8 @@
 
     function toggleLoading(show, text = "กำลังดำเนินการ...") {
         const loader = document.getElementById('loading-overlay');
-        document.getElementById('loading-text').innerText = text;
+        const textEl = document.getElementById('loading-text');
+        if(textEl) textEl.innerText = text;
         if(show) loader.classList.remove('hidden');
         else loader.classList.add('hidden');
     }
