@@ -27,13 +27,14 @@
         .hidden { display: none; }
         input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; text-align: center; font-size: 16px; }
         #loading-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background:rgba(255,255,255,0.8); z-index:9999; display:flex; flex-direction:column; justify-content:center; align-items:center; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
 <div id="loading-overlay" class="hidden">
     <div style="border: 4px solid #f3f3f3; border-top: 4px solid #00796b; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
-    <p>กำลังตรวจสอบข้อมูล...</p>
+    <p>กำลังดำเนินการ...</p>
 </div>
 
 <div class="header">somboon VanAccessory ลงเวลา</div>
@@ -87,8 +88,6 @@
     window.onload = function() {
         initMap();
         initLiff();
-        if(localStorage.getItem('lastTimeIn')) document.getElementById('time-in').innerText = localStorage.getItem('lastTimeIn');
-        if(localStorage.getItem('lastTimeOut')) document.getElementById('time-out').innerText = localStorage.getItem('lastTimeOut');
     };
 
     function initMap() {
@@ -115,26 +114,27 @@
         const sid = localStorage.getItem('empId');
         if (sid) {
             showCheckinPage(sid, localStorage.getItem('empName'));
+            if(localStorage.getItem('lastTimeIn')) document.getElementById('time-in').innerText = localStorage.getItem('lastTimeIn');
+            if(localStorage.getItem('lastTimeOut')) document.getElementById('time-out').innerText = localStorage.getItem('lastTimeOut');
         } else {
             document.getElementById('registration-form').classList.remove('hidden');
             document.getElementById('status-text').innerText = "โปรดลงทะเบียน";
         }
     }
 
-    // ฟังก์ชันตรวจสอบพนักงานกับ Sheet
     async function verifyEmployee() {
         const id = document.getElementById('reg-id').value.trim();
         if(!id) return alert("กรุณากรอกรหัสพนักงาน");
-
         document.getElementById('loading-overlay').classList.remove('hidden');
 
         try {
-            // ส่งไปเช็คที่ Apps Script
             const response = await fetch(googleAppUrl, {
                 method: 'POST',
                 body: JSON.stringify({ action: "register", employeeId: id, lineUid: lineUid })
             });
-            const result = await response.json();
+            // รับเป็น Text ก่อนแล้วค่อย Parse เพื่อป้องกัน JSON Error ค้าง
+            const resText = await response.text();
+            const result = JSON.parse(resText);
 
             if(result.success) {
                 localStorage.setItem('empId', result.data.employeeId);
@@ -146,7 +146,8 @@
                 document.getElementById('loading-overlay').classList.add('hidden');
             }
         } catch (e) {
-            alert("เกิดข้อผิดพลาดในการเชื่อมต่อฐานข้อมูล");
+            console.error(e);
+            alert("ไม่สามารถติดต่อฐานข้อมูลได้ โปรดลองอีกครั้ง");
             document.getElementById('loading-overlay').classList.add('hidden');
         }
     }
@@ -156,10 +157,8 @@
             const lat = pos.coords.latitude, lng = pos.coords.longitude;
             if (userMarker) map.removeLayer(userMarker);
             userMarker = L.marker([lat, lng]).addTo(map);
-            
             const dist = calculateDistance(lat, lng, officePos[0], officePos[1]);
             document.getElementById('distance-info').innerText = "📍 ระยะห่าง: " + Math.round(dist) + " เมตร";
-
             const btnIn = document.getElementById('btn-in'), btnOut = document.getElementById('btn-out');
             const statusTxt = document.getElementById('status-text');
 
@@ -186,7 +185,7 @@
         document.getElementById('checkin-section').classList.remove('hidden');
         document.getElementById('display-id').innerText = "ID: " + id;
         document.getElementById('display-name').innerText = name;
-        document.getElementById('display-dept').innerText = localStorage.getItem('empDept') || "ทั่วไป";
+        document.getElementById('display-dept').innerText = localStorage.getItem('empDept') || "";
     }
 
     function processCheckin(status) {
@@ -194,6 +193,7 @@
         const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
         if(!confirm("ยืนยันการ " + status + " ?")) return;
         
+        document.getElementById('loading-overlay').classList.remove('hidden');
         document.getElementById('status-text').innerText = "⌛ กำลังบันทึก...";
         
         navigator.geolocation.getCurrentPosition(pos => {
@@ -208,11 +208,12 @@
                 })
             }).then(() => {
                 const key = status === 'เข้างาน' ? 'lastTimeIn' : 'lastTimeOut';
-                const id = status === 'เข้างาน' ? 'time-in' : 'time-out';
-                document.getElementById(id).innerText = timeStr;
                 localStorage.setItem(key, timeStr);
                 alert("บันทึก " + status + " สำเร็จ!");
-                document.getElementById('status-text').innerText = "บันทึกล่าสุด: " + status + " (" + timeStr + ")";
+                location.reload();
+            }).catch(e => {
+                alert("เกิดข้อผิดพลาดในการบันทึก");
+                document.getElementById('loading-overlay').classList.add('hidden');
             });
         });
     }
@@ -224,6 +225,5 @@
         }
     }
 </script>
-<style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
 </body>
 </html>
