@@ -8,75 +8,82 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
-        body { font-family: sans-serif; margin: 0; background: #f0f2f5; color: #1c1e21; }
-        .header { background: #00796b; color: white; padding: 20px; text-align: center; font-size: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
-        .profile-img { width: 35px; height: 35px; border-radius: 50%; border: 2px solid white; display: none; }
-        .container { padding: 15px; max-width: 400px; margin: auto; }
-        #map { height: 250px; width: 100%; border-radius: 12px; margin-bottom: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-        .card { background: white; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
-        .btn-group { display: flex; gap: 10px; }
-        .btn { flex: 1; padding: 15px; border: none; border-radius: 10px; color: white; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        body { font-family: sans-serif; margin: 0; background: #f0f2f5; color: #1c1e21; padding-bottom: 20px; }
+        .header { background: #00796b; color: white; padding: 15px; text-align: center; font-size: 18px; font-weight: bold; position: sticky; top: 0; z-index: 1000; }
+        .container { padding: 10px; max-width: 450px; margin: auto; }
+        
+        /* แก้ไขตรงนี้เพื่อให้แผนที่แสดงผลเสมอ */
+        #map { height: 250px; width: 100%; border-radius: 15px; margin-bottom: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border: 2px solid white; z-index: 1; }
+        
+        .profile-section { text-align: center; margin-bottom: 10px; }
+        .user-avatar { width: 80px; height: 80px; border-radius: 50%; border: 3px solid #00796b; object-fit: cover; display: none; margin: 0 auto 5px; }
+        
+        #distance-info { text-align: center; font-size: 16px; font-weight: bold; color: #00796b; background: white; padding: 10px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        
+        .card { background: white; padding: 15px; border-radius: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; }
+        .btn { flex: 1; padding: 16px; border: none; border-radius: 12px; color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .btn-in { background: #28a745; }
         .btn-out { background: #dc3545; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; opacity: 0.6; }
-        .btn-reg { background: #007bff; width: 100%; margin-top: 10px; }
+        .btn:disabled { background: #ccc; opacity: 0.6; }
+        
+        #status-text { text-align: center; font-weight: bold; margin-top: 15px; display: block; font-size: 14px; }
         .hidden { display: none; }
-        #status-text { text-align: center; font-weight: bold; margin-top: 10px; display: block; }
-        #distance-info { text-align: center; font-size: 14px; font-weight: bold; color: #00796b; margin-bottom: 10px; background: #e0f2f1; padding: 8px; border-radius: 8px; }
     </style>
 </head>
 <body>
 
-<div class="header">
-    <img id="user-img" class="profile-img" src="" alt="Profile">
-    <span>ระบบลงเวลาทำงาน</span>
-</div>
+<div class="header">somboon VanAccessory ลงเวลา</div>
 
 <div class="container">
     <div id="map"></div>
-    <div id="distance-info">⌛ กำลังคำนวณระยะห่าง...</div>
+    
+    <div id="distance-info">📍 กำลังคำนวณระยะทาง...</div>
+
+    <div class="profile-section">
+        <img id="user-img" class="user-avatar" src="" alt="Profile">
+        <div id="checkin-section" class="hidden">
+            <p style="margin: 5px 0;">คุณ: <strong id="display-name"></strong> (<span id="display-id"></span>)</p>
+            <div class="card">
+                <div class="btn-group">
+                    <button id="btn-in" class="btn btn-in" onclick="processCheckin('เข้างาน')" disabled>เข้างาน</button>
+                    <button id="btn-out" class="btn btn-out" onclick="processCheckin('ออกงาน')" disabled>ออกงาน</button>
+                </div>
+            </div>
+            <button style="background:none; border:none; color:#999; font-size:11px; margin-top:10px; cursor:pointer;" onclick="clearData()">🔄 แก้ไขข้อมูล</button>
+        </div>
+    </div>
 
     <div id="registration-form" class="card hidden">
-        <h3>📝 ลงทะเบียนพนักงาน</h3>
-        <input type="text" id="reg-id" placeholder="รหัสพนักงาน">
-        <input type="text" id="reg-name" placeholder="ชื่อ-นามสกุล">
-        <button class="btn btn-reg" onclick="register()">บันทึกการลงทะเบียน</button>
+        <h3 style="margin-top:0;">📝 ลงทะเบียน</h3>
+        <input type="text" id="reg-id" placeholder="รหัสพนักงาน" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
+        <input type="text" id="reg-name" placeholder="ชื่อ-นามสกุล" style="width:100%; padding:10px; margin-bottom:10px; border-radius:8px; border:1px solid #ddd;">
+        <button class="btn btn-in" style="width:100%" onclick="register()">เริ่มใช้งาน</button>
     </div>
 
-    <div id="checkin-section" class="card hidden">
-        <p>👤 สวัสดีคุณ: <strong id="display-name"></strong> (<span id="display-id"></span>)</p>
-        <div class="btn-group">
-            <button id="btn-in" class="btn btn-in" onclick="processCheckin('เข้างาน')" disabled>เข้างาน</button>
-            <button id="btn-out" class="btn btn-out" onclick="processCheckin('ออกงาน')" disabled>ออกงาน</button>
-        </div>
-        <center><button id="btn-edit" style="background:none; border:none; color:blue; font-size:12px; margin-top:15px; cursor:pointer;" onclick="clearData()">แก้ไขข้อมูลพนักงาน</button></center>
-    </div>
-
-    <span id="status-text">กำลังโหลดข้อมูล...</span>
+    <span id="status-text">ระบบกำลังทำงาน...</span>
 </div>
 
 <script>
-    // --- ตั้งค่าเหมือนเดิมของคุณ (ห้ามเปลี่ยน) ---
     const LIFF_ID = "2009617030-XtqKOyjE"; 
     const officePos = [13.862444, 100.503806]; 
     const googleAppUrl = "https://script.google.com/macros/s/AKfycbz0_6Z0zRQ_PO5ZjVEmVaICtQ_57h6BlcfG6ONMI_-EDGHrkwrclAq1sk4iiTkS4oWc/exec"; 
     const radiusLimit = 100; 
-    
-    // --- เริ่มต้นระบบแผนที่ ---
-    let map = L.map('map').setView(officePos, 17);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-    
-    // สร้างรัศมีวงกลมรอบร้าน
-    L.circle(officePos, { radius: radiusLimit, color: '#00796b', fillOpacity: 0.1 }).addTo(map);
-    // หมุดร้าน (สีแดง)
-    L.circleMarker(officePos, { radius: 8, color: 'red', fillOpacity: 1 }).addTo(map).bindPopup("ร้าน somboon VanAccessory");
-    
-    let userMarker;
 
+    let map, userMarker;
+
+    // เริ่มระบบ
     window.onload = function() {
+        initMap();
         initLiff();
     };
+
+    function initMap() {
+        map = L.map('map').setView(officePos, 17);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        L.circle(officePos, { radius: radiusLimit, color: 'red', fillOpacity: 0.1 }).addTo(map);
+        L.circleMarker(officePos, { radius: 6, color: 'red', fillOpacity: 1 }).addTo(map).bindPopup("ร้านสมบูรณ์");
+    }
 
     async function initLiff() {
         try {
@@ -88,7 +95,6 @@
                 document.getElementById('user-img').src = profile.pictureUrl;
                 document.getElementById('user-img').style.display = 'block';
                 showCheckinPage(profile.userId, profile.displayName);
-                document.getElementById('btn-edit').classList.add('hidden');
             } else {
                 checkManualData();
             }
@@ -100,14 +106,10 @@
     }
 
     function checkManualData() {
-        const savedId = localStorage.getItem('empId');
-        const savedName = localStorage.getItem('empName');
-        if (savedId && savedName) {
-            showCheckinPage(savedId, savedName);
-        } else {
-            document.getElementById('registration-form').classList.remove('hidden');
-            document.getElementById('status-text').innerText = "กรุณาลงทะเบียนก่อนใช้งาน";
-        }
+        const sid = localStorage.getItem('empId');
+        const sname = localStorage.getItem('empName');
+        if (sid && sname) showCheckinPage(sid, sname);
+        else document.getElementById('registration-form').classList.remove('hidden');
     }
 
     function startTracking() {
@@ -115,101 +117,80 @@
             const lat = pos.coords.latitude;
             const lng = pos.coords.longitude;
             
-            // อัปเดตหมุดของผู้ใช้ (สีน้ำเงิน)
             if (userMarker) map.removeLayer(userMarker);
             userMarker = L.marker([lat, lng]).addTo(map).bindPopup("คุณอยู่ที่นี่").openPopup();
             
-            // ปรับหน้าจอให้เห็นทั้งร้านและพนักงาน
-            const group = new L.featureGroup([L.marker(officePos), userMarker]);
-            map.fitBounds(group.getBounds().pad(0.5)); 
+            // ซูมให้เห็นทั้งสองจุด
+            const group = new L.featureGroup([L.circleMarker(officePos), userMarker]);
+            map.fitBounds(group.getBounds().pad(0.5));
 
-            // คำนวณระยะห่าง
             const dist = calculateDistance(lat, lng, officePos[0], officePos[1]);
-            document.getElementById('distance-info').innerText = "📍 ระยะห่างจากร้าน: " + Math.round(dist) + " เมตร";
+            document.getElementById('distance-info').innerText = "📍 ระยะห่าง: " + Math.round(dist) + " เมตร";
 
-            // ตรวจสอบเงื่อนไขล็อคปุ่ม
             const btnIn = document.getElementById('btn-in');
             const btnOut = document.getElementById('btn-out');
-            
+            const statusTxt = document.getElementById('status-text');
+
             if (dist <= radiusLimit) {
-                btnIn.disabled = false;
-                btnOut.disabled = false;
-                document.getElementById('status-text').innerText = "✅ อยู่ในพื้นที่ร้าน พร้อมบันทึก";
-                document.getElementById('status-text').style.color = "green";
+                btnIn.disabled = false; btnOut.disabled = false;
+                statusTxt.innerText = "✅ อยู่ในพื้นที่ร้าน พร้อมบันทึก";
+                statusTxt.style.color = "green";
             } else {
-                btnIn.disabled = true;
-                btnOut.disabled = true;
-                document.getElementById('status-text').innerText = "❌ คุณไม่ได้อยู่ในพื้นที่ร้าน";
-                document.getElementById('status-text').style.color = "red";
+                btnIn.disabled = true; btnOut.disabled = true;
+                statusTxt.innerText = "❌ ไม่อยู่ในพื้นที่ร้าน";
+                statusTxt.style.color = "red";
             }
-        }, err => {
-            document.getElementById('status-text').innerText = "⚠️ กรุณาเปิด GPS และอนุญาตสิทธิ์";
-        }, { enableHighAccuracy: true });
+        }, null, { enableHighAccuracy: true });
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
         const R = 6371e3;
-        const φ1 = lat1 * Math.PI/180;
-        const φ2 = lat2 * Math.PI/180;
-        const Δφ = (lat2-lat1) * Math.PI/180;
-        const Δλ = (lon2-lon1) * Math.PI/180;
-        const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-                  Math.cos(φ1) * Math.cos(φ2) *
-                  Math.sin(Δλ/2) * Math.sin(Δλ/2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        return R * c;
-    }
-
-    function register() {
-        const id = document.getElementById('reg-id').value;
-        const name = document.getElementById('reg-name').value;
-        if (id && name) {
-            localStorage.setItem('empId', id);
-            localStorage.setItem('empName', name);
-            showCheckinPage(id, name);
-        } else {
-            alert("กรุณากรอกข้อมูลให้ครบครับ");
-        }
+        const dLat = (lat2-lat1) * Math.PI/180;
+        const dLon = (lon2-lon1) * Math.PI/180;
+        const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                  Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) *
+                  Math.sin(dLon/2) * Math.sin(dLon/2);
+        return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
     }
 
     function showCheckinPage(id, name) {
         document.getElementById('registration-form').classList.add('hidden');
         document.getElementById('checkin-section').classList.remove('hidden');
-        document.getElementById('display-id').innerText = id;
+        document.getElementById('display-id').innerText = id.substring(0,8) + "...";
         document.getElementById('display-name').innerText = name;
-        document.getElementById('status-text').innerText = "กำลังตรวจสอบพิกัด...";
     }
 
     function processCheckin(status) {
-        if(!confirm("ยืนยันบันทึก " + status + " ?")) return;
-        
-        document.getElementById('status-text').innerText = "⌛ กำลังบันทึกข้อมูล...";
-        
+        if(!confirm("ยืนยันการ " + status + " ?")) return;
+        document.getElementById('status-text').innerText = "⌛ กำลังบันทึก...";
         navigator.geolocation.getCurrentPosition(pos => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            
             fetch(googleAppUrl, {
-                method: 'POST',
-                mode: 'no-cors',
+                method: 'POST', mode: 'no-cors',
                 body: JSON.stringify({
                     employeeId: localStorage.getItem('empId'),
                     name: localStorage.getItem('empName'),
                     status: status,
-                    coords: lat + "," + lng
+                    coords: pos.coords.latitude + "," + pos.coords.longitude
                 })
             }).then(() => {
-                document.getElementById('status-text').innerText = "✅ บันทึก " + status + " สำเร็จ!";
-                document.getElementById('status-text').style.color = "green";
-                alert("บันทึก " + status + " เรียบร้อยแล้ว");
-            }).catch(e => {
-                alert("เกิดข้อผิดพลาดในการเชื่อมต่อ Google Sheets");
+                alert("บันทึกเรียบร้อย!");
+                location.reload();
             });
         });
     }
 
+    function register() {
+        const id = document.getElementById('reg-id').value;
+        const name = document.getElementById('reg-name').value;
+        if(id && name) {
+            localStorage.setItem('empId', id);
+            localStorage.setItem('empName', name);
+            location.reload();
+        }
+    }
+
     function clearData() {
-        if(confirm("ต้องการเปลี่ยนชื่อหรือรหัสพนักงานใช่ไหม?")) {
+        if(confirm("ล้างข้อมูลเพื่อลงทะเบียนใหม่?")) {
             localStorage.clear();
             location.reload();
         }
