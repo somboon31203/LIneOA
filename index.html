@@ -34,7 +34,7 @@
 
 <div id="loading-overlay" class="hidden">
     <div style="border: 4px solid #f3f3f3; border-top: 4px solid #00796b; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite;"></div>
-    <p>กำลังดำเนินการ...</p>
+    <p id="loading-text">กำลังดำเนินการ...</p>
 </div>
 
 <div class="header">somboon VanAccessory ลงเวลา</div>
@@ -45,7 +45,7 @@
 
     <div id="checkin-section" class="hidden">
         <div class="profile-section">
-            <img id="user-img" class="user-avatar" src="https://via.placeholder.com/50" alt="Profile">
+            <img id="user-img" class="user-avatar" src="https://www.w3schools.com/howto/img_avatar.png" alt="Profile">
             <div class="user-details">
                 <strong>คุณ <span id="display-name"></span></strong><br>
                 <span id="display-dept" style="font-size: 12px; color: #00796b;"></span> | 
@@ -77,7 +77,7 @@
 </div>
 
 <script>
-    // --- ตั้งค่าเดิม (ห้ามตัด) ---
+    // --- ตั้งค่าเดิม (คงไว้ตามเดิม) ---
     const LIFF_ID = "2009617030-XtqKOyjE"; 
     const officePos = [13.862444, 100.503806]; 
     const googleAppUrl = "https://script.google.com/macros/s/AKfycbz0_6Z0zRQ_PO5ZjVEmVaICtQ_57h6BlcfG6ONMI_-EDGHrkwrclAq1sk4iiTkS4oWc/exec"; 
@@ -103,7 +103,7 @@
             if (liff.isLoggedIn()) {
                 const profile = await liff.getProfile();
                 lineUid = profile.userId;
-                document.getElementById('user-img').src = profile.pictureUrl;
+                if(profile.pictureUrl) document.getElementById('user-img').src = profile.pictureUrl;
             }
             checkManualData();
             startTracking();
@@ -125,16 +125,18 @@
     async function verifyEmployee() {
         const id = document.getElementById('reg-id').value.trim();
         if(!id) return alert("กรุณากรอกรหัสพนักงาน");
-        document.getElementById('loading-overlay').classList.remove('hidden');
+        
+        toggleLoading(true, "กำลังตรวจสอบรหัส...");
 
         try {
             const response = await fetch(googleAppUrl, {
                 method: 'POST',
                 body: JSON.stringify({ action: "register", employeeId: id, lineUid: lineUid })
             });
-            // รับเป็น Text ก่อนแล้วค่อย Parse เพื่อป้องกัน JSON Error ค้าง
+            
             const resText = await response.text();
-            const result = JSON.parse(resText);
+            let result;
+            try { result = JSON.parse(resText); } catch(e) { throw new Error("การตอบกลับจากระบบไม่ถูกต้อง"); }
 
             if(result.success) {
                 localStorage.setItem('empId', result.data.employeeId);
@@ -143,22 +145,27 @@
                 location.reload();
             } else {
                 alert(result.message);
-                document.getElementById('loading-overlay').classList.add('hidden');
+                toggleLoading(false);
             }
         } catch (e) {
             console.error(e);
-            alert("ไม่สามารถติดต่อฐานข้อมูลได้ โปรดลองอีกครั้ง");
-            document.getElementById('loading-overlay').classList.add('hidden');
+            alert("ไม่สามารถติดต่อฐานข้อมูลได้: " + e.message);
+            toggleLoading(false);
         }
     }
 
     function startTracking() {
+        if (!navigator.geolocation) {
+            document.getElementById('distance-info').innerText = "❌ เบราว์เซอร์ไม่รองรับ GPS";
+            return;
+        }
         navigator.geolocation.watchPosition(pos => {
             const lat = pos.coords.latitude, lng = pos.coords.longitude;
             if (userMarker) map.removeLayer(userMarker);
             userMarker = L.marker([lat, lng]).addTo(map);
             const dist = calculateDistance(lat, lng, officePos[0], officePos[1]);
             document.getElementById('distance-info').innerText = "📍 ระยะห่าง: " + Math.round(dist) + " เมตร";
+            
             const btnIn = document.getElementById('btn-in'), btnOut = document.getElementById('btn-out');
             const statusTxt = document.getElementById('status-text');
 
@@ -169,7 +176,9 @@
                 btnIn.disabled = true; btnOut.disabled = true;
                 statusTxt.innerText = "❌ ไม่อยู่ในพื้นที่ร้าน"; statusTxt.style.color = "red";
             }
-        }, null, { enableHighAccuracy: true });
+        }, err => {
+            document.getElementById('distance-info').innerText = "❌ โปรดเปิด GPS และอนุญาตสิทธิ์";
+        }, { enableHighAccuracy: true });
     }
 
     function calculateDistance(lat1, lon1, lat2, lon2) {
@@ -193,8 +202,7 @@
         const timeStr = now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
         if(!confirm("ยืนยันการ " + status + " ?")) return;
         
-        document.getElementById('loading-overlay').classList.remove('hidden');
-        document.getElementById('status-text').innerText = "⌛ กำลังบันทึก...";
+        toggleLoading(true, "กำลังบันทึก...");
         
         navigator.geolocation.getCurrentPosition(pos => {
             fetch(googleAppUrl, {
@@ -213,9 +221,19 @@
                 location.reload();
             }).catch(e => {
                 alert("เกิดข้อผิดพลาดในการบันทึก");
-                document.getElementById('loading-overlay').classList.add('hidden');
+                toggleLoading(false);
             });
+        }, err => {
+            alert("ไม่สามารถระบุพิกัดได้");
+            toggleLoading(false);
         });
+    }
+
+    function toggleLoading(show, text = "กำลังดำเนินการ...") {
+        const loader = document.getElementById('loading-overlay');
+        document.getElementById('loading-text').innerText = text;
+        if(show) loader.classList.remove('hidden');
+        else loader.classList.add('hidden');
     }
 
     function clearData() {
